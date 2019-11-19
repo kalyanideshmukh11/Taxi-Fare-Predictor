@@ -5,11 +5,11 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import seaborn as sbn
 
-print(os.listdir("/home/014529112/cmpe257/NY_Taxi_Fare_Prediction"))
+print(os.listdir("."))
 
 #read train and test dataset 
-TRAIN_PATH = "/home/sam2220/Desktop/ML_projects/NY_taxi_fare_prediction/kaggle_challenge_dataset/train.csv"
-TEST_PATH = "/home/sam2220/Desktop/ML_projects/NY_taxi_fare_prediction/kaggle_challenge_dataset/test.csv"
+TRAIN_PATH = "./train.csv"
+TEST_PATH = "./test.csv"
 with open(TRAIN_PATH) as file:
     len_train = len(file.readlines())
 
