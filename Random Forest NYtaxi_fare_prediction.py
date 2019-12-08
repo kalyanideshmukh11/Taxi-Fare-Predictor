@@ -64,93 +64,119 @@ def add_dist_from_jfk(data_chunk):
     JFK_coord = (40.6413, -73.7781)
     pickup_JFK = add_distance(data_chunk['pickup_latitude'], data_chunk['pickup_longitude'], JFK_coord[0], JFK_coord[1]) 
     dropoff_JFK = add_distance(JFK_coord[0], JFK_coord[1], data_chunk['dropoff_latitude'], data_chunk['dropoff_longitude'])
-    #data_chunk['JFK_distance'] = pd.concat([pickup_JFK, dropoff_JFK], axis=1).min(axis=1)
+    data_chunk['JFK_distance'] = pd.concat([pickup_JFK, dropoff_JFK], axis=1).min(axis=1)
 
     return pickup_JFK, dropoff_JFK
 
 
 def clean_df(PATH, cols, datatypes, chunksize):
+    if PATH == TEST_PATH:
+        df_list = []
+        for chunk in pd.read_csv(PATH, usecols = cols, dtype=datatypes, chunksize=chunksize):
+            chunk['pickup_datetime'] = chunk['pickup_datetime'].str.slice(0, 16)
+            chunk['pickup_datetime'] = pd.to_datetime(chunk['pickup_datetime'], utc=True, 
+                                                      format='%Y-%m-%d %H:%M')
+            
+            #add datetime features to the data 
+            #pickup_datetime -> hour, month, year, isWeekday, day
+            add_datetime_features(chunk)
+            
+            #add distance travelled by the cab to dataframe
+            chunk['haversine_distnace'] = add_distance(chunk.pickup_latitude, chunk.pickup_longitude,
+                        chunk.dropoff_latitude, chunk.dropoff_longitude)
 
-    df_list = []
-    for chunk in pd.read_csv(PATH, usecols = cols, dtype=datatypes, chunksize=chunksize):  
-        #converting pickup datetime to proper format
-        chunk['pickup_datetime'] = chunk['pickup_datetime'].str.slice(0, 16)
-        chunk['pickup_datetime'] = pd.to_datetime(chunk['pickup_datetime'], utc=True, 
-                                                    format='%Y-%m-%d %H:%M')
-        #outlier removal
-        #remove rows with passenger count 0 and more than 6
-        chunk = chunk[(chunk['passenger_count'] > 0) & (chunk['passenger_count'] < 7) ]
-        
-        #remove rows with fare amount less than $2 and greater than $400 
-        chunk = chunk[(chunk['fare_amount'] > 2.0) & (chunk['fare_amount'] < 400.0)]     
+            #add direction of the distance
+            chunk['direction'] = calculate_direction(chunk.pickup_latitude, chunk.pickup_longitude,
+                        chunk.dropoff_latitude, chunk.dropoff_longitude)
+            
+            #add a distance_from_JFK_airport to the features as the fare would be more for places closer to airport
+            pickup_JFK, dropoff_JFK = add_dist_from_jfk(chunk)
+            chunk['JFK_distance'] = pd.concat([pickup_JFK, dropoff_JFK], axis=1).min(axis=1)
 
-        # Remove data with invalid coordinates
-        # NY Coordinates are around 40 N and 74 W
-        # 1 degree is equal to around 69 miles
-        # So this range should be fine for our purpose
-        chunk = chunk[(chunk['pickup_latitude'] < 42.0) & (chunk['pickup_latitude'] > 39.0)]
-        chunk = chunk[(chunk['dropoff_latitude'] < 42.0) & (chunk['dropoff_latitude'] > 39.0)]
-        chunk = chunk[(chunk['pickup_longitude'] < -70.0) & (chunk['pickup_longitude'] > -75.0)]
-        chunk = chunk[(chunk['dropoff_longitude'] < -70.0) & (chunk['dropoff_longitude'] > -75.0)]       
-        
-        #add datetime features to the data 
-        #pickup_datetime -> hour, month, year, isWeekday, day
-        add_datetime_features(chunk)
-        
-        #removing data with missing points -> (does not affect the number of sample points)
-        #chunk = chunk.dropna(how = 'any', axis = 'rows')
-        
-        #add distance travelled by the cab to dataframe
-        chunk['haversine_distnace'] = add_distance(chunk.pickup_latitude, chunk.pickup_longitude,
-                    chunk.dropoff_latitude, chunk.dropoff_longitude)
+            df_list.append(chunk)
+        return pd.concat(df_list)
+    
+    elif(PATH == TRAIN_PATH):
+        df_list = []
+        for chunk in pd.read_csv(PATH, usecols = cols, dtype=datatypes, chunksize=chunksize):  
+            #converting pickup datetime to proper format
+            chunk['pickup_datetime'] = chunk['pickup_datetime'].str.slice(0, 16)
+            chunk['pickup_datetime'] = pd.to_datetime(chunk['pickup_datetime'], utc=True, 
+                                                      format='%Y-%m-%d %H:%M')
+            #outlier removal
+            #remove rows with passenger count 0 and more than 6
+            chunk = chunk[(chunk['passenger_count'] > 0) & (chunk['passenger_count'] < 7) ]
+            
+            #remove rows with fare amount less than $1 and greater than $400 
+            chunk = chunk[(chunk['fare_amount'] > 1.0) & (chunk['fare_amount'] < 400.0)]     
 
-        #add direction of the distance
-        chunk['direction'] = calculate_direction(chunk.pickup_latitude, chunk.pickup_longitude,
-                    chunk.dropoff_latitude, chunk.dropoff_longitude)            
-        
-        chunk = chunk[(chunk['haversine_distnace'] > 0.1) & (chunk['haversine_distnace'] < 100)] 
-        
-        #add a distance_from_JFK_airport to the features as the fare would be more for places closer to airport
-        pickup_JFK, dropoff_JFK = add_dist_from_jfk(chunk)
-        chunk['JFK_distance'] = pd.concat([pickup_JFK, dropoff_JFK], axis=1).min(axis=1)
+            # Remove data with invalid coordinates
+            # NY Coordinates are around 40 N and 74 W
+            # 1 degree is equal to around 69 miles
+            # So this range should be fine for our purpose
+            chunk = chunk[(chunk['pickup_latitude'] < 42.0) & (chunk['pickup_latitude'] > 39.0)]
+            chunk = chunk[(chunk['dropoff_latitude'] < 42.0) & (chunk['dropoff_latitude'] > 39.0)]
+            chunk = chunk[(chunk['pickup_longitude'] < -70.0) & (chunk['pickup_longitude'] > -75.0)]
+            chunk = chunk[(chunk['dropoff_longitude'] < -70.0) & (chunk['dropoff_longitude'] > -75.0)]       
+            
+            #add datetime features to the data 
+            #pickup_datetime -> hour, month, year, isWeekday, day
+            add_datetime_features(chunk)
+            
+            #add distance travelled by the cab to dataframe
+            chunk['haversine_distnace'] = add_distance(chunk.pickup_latitude, chunk.pickup_longitude,
+                        chunk.dropoff_latitude, chunk.dropoff_longitude)
 
-        #appending chunks to the dataframe list
-        df_list.append(chunk)
-        #y_df_list.append(chunk['fare_amount'])
-        #chunk.drop(labels = 'fare_amount', axis=1, inplace=True)
-        #X_df_list.append(chunk)
-        
-    df = pd.concat(df_list)
-    #X_df = pd.concat(X_df_list)
-    #y_df = pd.concat(y_df_list)
-    return  df
+            #add direction of the distance
+            chunk['direction'] = calculate_direction(chunk.pickup_latitude, chunk.pickup_longitude,
+                        chunk.dropoff_latitude, chunk.dropoff_longitude)            
+            
+            chunk = chunk[(chunk['haversine_distnace'] > 0.1) & (chunk['haversine_distnace'] < 100)] 
+            
+            #add a distance_from_JFK_airport to the features as the fare would be more for places closer to airport
+            pickup_JFK, dropoff_JFK = add_dist_from_jfk(chunk)
+            chunk['JFK_distance'] = pd.concat([pickup_JFK, dropoff_JFK], axis=1).min(axis=1)
 
-print("loading")
+            #appending chunks to the dataframe list
+            df_list.append(chunk)
+            
+        df = pd.concat(df_list)
+        return  df
+
 train_target = clean_df(TRAIN_PATH, train_cols, train_types, chunksize = 500000)
 train_target.describe()
 train_target.head()
-del train_target['pickup_datetime']
+features_to_drop = ['pickup_datetime']
+train_target.drop(labels = features_to_drop, axis=1, inplace=True)
+train_target.month = train_target.month.astype(dtype = 'uint8')
+train_target.year = train_target.year.astype(dtype = 'uint16')
+train_target.hour = train_target.hour.astype(dtype = 'uint8')
 train_target.columns.values
 
 y = train_target['fare_amount']
 x = train_target.drop(columns=['fare_amount'])
 X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.20)
 
-print("training")
 Regression =RandomForestRegressor(random_state=0, warm_start=True, n_estimators=10, n_jobs=-1)
 Regression.fit(X_train,y_train)
-
-print("training")
 Regression.set_params(n_estimators=18)
 Regression.fit(X_train, y_train)
 
-print("training")
 Regression.set_params(n_estimators=25)
 Regression.fit(X_train, y_train)
 
-print(Regression.score(X_test, y_test))
-
-
 y_pred = Regression.predict(X_test)
-print(mean_squared_error(y_test, y_pred))
+print(mean_squared_error(y_test, y_pred) ** 0.5)
 
+original_test_data = pd.read_csv(TEST_PATH)
+test_dataset = clean_df(TEST_PATH, test_cols, test_types, chunksize = 2000)
+features_to_drop = ['pickup_datetime']
+test_dataset.drop(labels = features_to_drop, axis=1, inplace=True)
+
+test_pred = Regression.predict(test_dataset)
+test_pred = np.around(test_pred, 2)
+
+submission = pd.DataFrame(
+    {'key': original_test_data.key, 'fare_amount': test_pred},
+    columns = ['key', 'fare_amount'])
+submission.to_csv('submission.csv', index = False)
