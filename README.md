@@ -7,7 +7,7 @@ Furthermore, this visibility can also attract more customers.Our approach is to 
 and using that data build a machine learning modelwhich  can  predict  the  expected  fare  amount.  We  have  only used  the  data such  as  pickup,  drop  off  locations,  time  of  theride, number of passengers etc.
 All of that data are availableat the start of the ride.
 ## Dataset
-The  dataset  used  in  this  project  is  approximately  5.7GBcomma  separated  value  (train.csv)  file  with  55  Million  rowsand   8   
+The  dataset  used  in  this  project  is  approximately  5.7GB comma  separated  value  (train.csv)  file  with  55  Million  rowsand   8   
 columns   available   on   Kaggle   [6].   
 Out of whichseven columns represent features and one  column  represents’fareamount’ i.e. a label. The dataset consists of information about  yellow  taxi  rides  between  year  2009  to  2015.  Thefeatures are divided into 4 parts, as follows:
 * Key: an object containing unique identifier for each rowin the dataset and pickup date and time.
